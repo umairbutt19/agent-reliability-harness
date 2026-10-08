@@ -1,0 +1,193 @@
+{
+  "name": "Agent Reliability Harness",
+  "nodes": [
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        -64,
+        -96
+      ],
+      "id": "9c0ae094-ef52-4d40-95ba-883b3d95f5c1",
+      "name": "When clicking ‘Execute workflow’"
+    },
+    {
+      "parameters": {
+        "jsCode": "return [\n  {\n    json: {\n      test_id: \"TC-001\",\n      user_input: \"What is 2 + 2?\",\n      expected_behavior: \"4\"\n    }\n  },\n  {\n    json: {\n      test_id: \"TC-002\",\n      user_input: \"What is the capital of France?\",\n      expected_behavior: \"Paris\"\n    }\n  },\n  {\n    json: {\n      test_id: \"TC-003\",\n      user_input: \"What is 10 multiplied by 5?\",\n      expected_behavior: \"50\"\n    }\n  }\n];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        192,
+        -96
+      ],
+      "id": "69f7e31c-38c3-4bfa-b931-31a702c62520",
+      "name": "Test Cases"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        448,
+        -96
+      ],
+      "id": "0478b9d4-3961-49e2-bbb4-f1d2f114caaf",
+      "name": "Loop Over Items"
+    },
+    {
+      "parameters": {
+        "jsCode": "const results = $input.all();\n\nconst total = results.length;\n\nconst passed = results.filter(\n  item => item.json.result === \"PASS\"\n).length;\n\nconst failed = results.filter(\n  item => item.json.result === \"FAIL\"\n).length;\n\nconst successRate = total > 0\n  ? Math.round((passed / total) * 100)\n  : 0;\n\nreturn [\n  {\n    json: {\n      total_tests: total,\n      passed: passed,\n      failed: failed,\n      success_rate: `${successRate}%`,\n      overall_status: failed === 0\n        ? \"RELIABLE\"\n        : \"NEEDS IMPROVEMENT\",\n      test_results: results.map(item => item.json)\n    }\n  }\n];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1248,
+        -112
+      ],
+      "id": "18334c38-cb6f-4a42-882f-e0e39b3ebc42",
+      "name": "Reliability Report"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=={{ $json.user_input }}",
+        "batching": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.9,
+      "position": [
+        672,
+        0
+      ],
+      "id": "b1204a77-9bbf-46e6-bd7e-fbcc04f9c409",
+      "name": "Basic LLM Chain"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const testId = $json.test_id;\nconst userInput = $json.user_input;\nconst expected = String($json.expected_behavior ?? \"\").trim().toLowerCase();\nconst actual = String($json.output ?? \"\").trim().toLowerCase();\n\nconst passed = actual.includes(expected);\n\nreturn {\n  json: {\n    test_id: testId,\n    user_input: userInput,\n    expected_behavior: $json.expected_behavior,\n    actual_response: $json.output,\n    result: passed ? \"PASS\" : \"FAIL\"\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1040,
+        0
+      ],
+      "id": "63291cc4-1ae4-4e0b-81d0-ae1455dd3f44",
+      "name": "Evaluate Response"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1.1,
+      "position": [
+        672,
+        224
+      ],
+      "id": "d796604c-83dc-45e3-a51a-e2d33190089a",
+      "name": "Google Gemini Chat Model",
+      "credentials": {
+        "googlePalmApi": {
+          "id": "IYJwUHtcVVvIM1mn",
+          "name": "Google Gemini(PaLM) Api account 2"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "When clicking ‘Execute workflow’": {
+      "main": [
+        [
+          {
+            "node": "Test Cases",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Test Cases": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loop Over Items": {
+      "main": [
+        [
+          {
+            "node": "Reliability Report",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Basic LLM Chain",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Basic LLM Chain": {
+      "main": [
+        [
+          {
+            "node": "Evaluate Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Evaluate Response": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Gemini Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Basic LLM Chain",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "versionId": "322752f7-2a7e-4886-b73b-b71f269ebd8e",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "dd8f6d01d2242a2dfff4871bcce3d36ccebbe96fb0a120881e00720858894466"
+  },
+  "nodeGroups": [],
+  "id": "JsHgZt13n5YKY0So",
+  "tags": []
+}
